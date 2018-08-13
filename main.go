@@ -105,9 +105,9 @@ func (d device) getAddr() string {
 }
 
 var ledStates = map[string]string{
-	"blink": "timer",
-	"off":   "none",
-	"on":    "default-on",
+	"blinking": "timer",
+	"off":      "none",
+	"on":       "default-on",
 }
 
 func main() {
