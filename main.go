@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -153,8 +152,8 @@ func setLedState(s string) {
 		return
 	}
 
-	cmd := fmt.Sprintf("echo %s > %s", newState, ledTriggerFile)
-	if _, err := exec.Command("sh", "-c", cmd).Output(); err != nil {
+	err = ioutil.WriteFile(ledTriggerFile, []byte(newState), 0644)
+	if err != nil {
 		log.Println(err)
 	}
 }
