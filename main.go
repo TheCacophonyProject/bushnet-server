@@ -8,10 +8,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,9 +27,9 @@ const (
 )
 
 type device struct {
-	Name string
-	IPv4 string
-	Port int
+	Name    string
+	Address string
+	Port    int
 }
 
 func (d device) getRecordingsList() []string {
@@ -101,7 +103,7 @@ func (d device) getRecordings(cptvFolder string) {
 	}
 }
 func (d device) getAddr() string {
-	return fmt.Sprintf("http://%s:%d", d.IPv4, d.Port)
+	return fmt.Sprintf("http://%s", net.JoinHostPort(d.Address, strconv.Itoa(d.Port)))
 }
 
 var ledStates = map[string]string{
@@ -111,17 +113,9 @@ var ledStates = map[string]string{
 }
 
 func main() {
-	err := runMain()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-}
-
-func runMain() error {
 	log.SetFlags(0) // Removes default timestamp SetFlags
 	os.MkdirAll(cptvFolder, 0755)
 	setLedState("off")
-	defer setLedState("off")
 	for {
 		devices := getDevices()
 		for _, device := range devices {
@@ -144,9 +138,12 @@ func setLedState(s string) {
 
 	b, err := ioutil.ReadFile(ledTriggerFile)
 	if err != nil {
-		return // Failed to read LED trigger file, probably because this is not being run on a raspberry pi
+		// Failed to read LED trigger file,
+		// probably because this is not being run on a raspberry pi
+		return
 	}
-	// This is to prevent writing the state to 'blinking' too often as this can make the LED not look like it is blinking.
+	// This is to prevent writing the state to 'blinking' too often
+	// as this can make the LED not look like it is blinking.
 	if strings.Contains(string(b), "["+newState+"]") {
 		return
 	}
@@ -158,11 +155,11 @@ func setLedState(s string) {
 }
 
 func getDevices() []device {
-	devices := []device{}
+	var devices []device
 	log.Println("starting search for devices...")
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
-		log.Fatalln("Failed to initialize resolver:", err.Error())
+		log.Fatalln("Failed to initialize resolver: %v", err)
 		return nil
 	}
 
@@ -170,9 +167,9 @@ func getDevices() []device {
 	go func(results <-chan *zeroconf.ServiceEntry) {
 		for entry := range results {
 			r := device{
-				Name: entry.HostName[:len(entry.HostName)-7],
-				IPv4: entry.AddrIPv4[0].String(),
-				Port: entry.Port,
+				Name:    entry.HostName[:len(entry.HostName)-7],
+				Address: entry.AddrIPv4[0].String(),
+				Port:    entry.Port,
 			}
 			devices = append(devices, r)
 		}
@@ -182,7 +179,7 @@ func getDevices() []device {
 	defer cancel()
 	err = resolver.Browse(ctx, avahiServiceType, "local.", entries)
 	if err != nil {
-		log.Fatalln("Failed to browse:", err.Error())
+		log.Fatalln("Failed to browse: %v", err)
 	}
 
 	<-ctx.Done()
