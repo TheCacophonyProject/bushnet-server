@@ -32,33 +32,29 @@ type device struct {
 	Port    int
 }
 
-func (d device) getRecordingsList() []string {
+func (d device) getRecordingsList() ([]string, error) {
 	resp, err := http.Get(d.getAddr() + "/api/recordings")
 	if err != nil {
-		log.Println(err)
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Println("non 200 response when getting recordings list")
-		return nil
+		return nil, errors.New("non 200 response when getting recordings list")
 	}
 	var ids []string
 	decoder := json.NewDecoder(resp.Body)
 	if err := decoder.Decode(&ids); err != nil {
-		log.Println(err)
-		return nil
+		return nil, err
 	}
-	return ids
+	return ids, nil
 }
 
 func (d device) getRecording(cptvFolder, id string) error {
 	setLedState("blinking")
 	resp, err := http.Get(d.getAddr() + "/api/recording/" + id)
 	if err != nil {
-		log.Println(err)
-		return nil
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -92,16 +88,22 @@ func (d device) deleteRecording(id string) error {
 	return nil
 }
 
-func (d device) getRecordings(cptvFolder string) {
+func (d device) getRecordings(cptvFolder string) error {
 	log.Printf("searching for recordings on '%s'", d.Name)
-	for _, id := range d.getRecordingsList() {
+	ids, err := d.getRecordingsList()
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
 		log.Printf("getting recording '%s'", id)
 		err := d.getRecording(cptvFolder, id)
 		if err != nil {
-			log.Println(err)
+			return err
 		}
 	}
+	return nil
 }
+
 func (d device) getAddr() string {
 	return fmt.Sprintf("http://%s", net.JoinHostPort(d.Address, strconv.Itoa(d.Port)))
 }
@@ -119,7 +121,10 @@ func main() {
 	for {
 		devices := getDevices()
 		for _, device := range devices {
-			device.getRecordings(cptvFolder)
+			err := device.getRecordings(cptvFolder)
+			if err != nil {
+				log.Printf("error with getting recordings from '%s': %v", device.Name, err)
+			}
 		}
 		if len(devices) > 0 {
 			setLedState("on")
