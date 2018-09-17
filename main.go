@@ -32,7 +32,13 @@ type device struct {
 }
 
 func (d device) getRecordingsList() ([]string, error) {
-	resp, err := http.Get(d.getAddr() + "/api/recordings")
+	req, err := http.NewRequest("GET", d.getAddr()+"/api/recordings", nil)
+	if err != nil {
+		return nil, err
+	}
+	addBasicAuth(req)
+	client := new(http.Client)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +57,13 @@ func (d device) getRecordingsList() ([]string, error) {
 
 func (d device) getRecording(cptvFolder, id string) error {
 	setLedState("blinking")
-	resp, err := http.Get(d.getAddr() + "/api/recording/" + id)
+	req, err := http.NewRequest("GET", d.getAddr()+"/api/recording/"+id, nil)
+	if err != nil {
+		return err
+	}
+	addBasicAuth(req)
+	client := new(http.Client)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -73,6 +85,10 @@ func (d device) getRecording(cptvFolder, id string) error {
 
 func (d device) deleteRecording(id string) error {
 	req, err := http.NewRequest("DELETE", d.getAddr()+"/api/recording/"+id, nil)
+	if err != nil {
+		return err
+	}
+	addBasicAuth(req)
 	client := new(http.Client)
 
 	resp, err := client.Do(req)
@@ -85,6 +101,10 @@ func (d device) deleteRecording(id string) error {
 		return errors.New("non 200 status code")
 	}
 	return nil
+}
+
+func addBasicAuth(req *http.Request) {
+	req.Header.Add("Authorization", "Basic YWRtaW46ZmVhdGhlcnM=")
 }
 
 func (d device) getRecordings(cptvFolder string) error {
